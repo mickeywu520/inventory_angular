@@ -13,7 +13,8 @@ import CryptoJS from "crypto-js";
 export class ApiService {
 
   authStatuschanged = new EventEmitter<void>();
-  private static BASE_URL = 'http://localhost:5050/api';
+//  private static BASE_URL = 'http://localhost:5050/api';
+    private static BASE_URL = 'https://mickeywu520-springboot-app.hf.space/api';
   private static ENCRYPTION_KEY = "phegon-dev-inventory";
 
 
