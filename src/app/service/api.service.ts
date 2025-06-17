@@ -1,6 +1,6 @@
 import { EventEmitter, Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, BehaviorSubject } from 'rxjs';
 import CryptoJS from "crypto-js";
 
 
@@ -12,9 +12,21 @@ import CryptoJS from "crypto-js";
 
 export class ApiService {
 
+  // BehaviorSubject for reactive categories
+  private categoriesSource = new BehaviorSubject<any[]>([]);
+  public categories$ = this.categoriesSource.asObservable();
+
+  // BehaviorSubject for reactive products
+  private productsSource = new BehaviorSubject<any[]>([]);
+  public products$ = this.productsSource.asObservable();
+
+  // BehaviorSubject for reactive suppliers
+  private suppliersSource = new BehaviorSubject<any[]>([]);
+  public suppliers$ = this.suppliersSource.asObservable();
+
   authStatuschanged = new EventEmitter<void>();
-//  private static BASE_URL = 'http://localhost:5050/api';
-    private static BASE_URL = 'https://mickeywu520-springboot-app.hf.space/api';
+  //private static BASE_URL = 'http://localhost:5050/api';
+  private static BASE_URL = 'https://mickeywu520-inventory-fastapi.hf.space/api';
   private static ENCRYPTION_KEY = "phegon-dev-inventory";
 
 
@@ -41,6 +53,79 @@ export class ApiService {
   private clearAuth() {
       localStorage.removeItem("token");
       localStorage.removeItem("role");
+  }
+
+
+  public fetchAndBroadcastCategories(): Observable<any[]> {
+    const httpOptions = { headers: this.getHeader() };
+    // Assuming the backend /api/categories/all returns an array of categories directly
+    const request = this.http.get<any[]>(`${ApiService.BASE_URL}/categories/all`, httpOptions);
+
+    request.subscribe({
+      next: (categoriesArray: any[]) => {
+        if (Array.isArray(categoriesArray)) {
+          this.categoriesSource.next(categoriesArray);
+        } else {
+          console.warn("fetchAndBroadcastCategories: Response was not an array.", categoriesArray);
+          this.categoriesSource.next([]); // Broadcast empty if structure is off
+        }
+      },
+      error: (err: any) => {
+        console.error("Error fetching categories for BehaviorSubject:", err);
+        this.categoriesSource.next([]); // Broadcast empty on error to clear stale data
+      }
+    });
+    return request; // Return the original observable for the caller
+  }
+
+
+  public fetchAndBroadcastProducts(): Observable<any[]> {
+    const httpOptions = { headers: this.getHeader() };
+    const request = this.http.get<any[]>(`${ApiService.BASE_URL}/products/all`, httpOptions);
+
+    request.subscribe({
+      next: (productsArray: any[]) => {
+        if (Array.isArray(productsArray)) {
+          this.productsSource.next(productsArray);
+        } else {
+          console.warn("fetchAndBroadcastProducts: Response was not an array.", productsArray);
+          this.productsSource.next([]);
+        }
+      },
+      error: (err: any) => {
+        console.error("Error fetching products for BehaviorSubject:", err);
+        this.productsSource.next([]);
+      }
+    });
+    return request;
+  }
+
+
+  public fetchAndBroadcastSuppliers(): Observable<any[]> {
+    const httpOptions = { headers: this.getHeader() };
+    const request = this.http.get<any[]>(`${ApiService.BASE_URL}/suppliers/all`, httpOptions);
+
+    request.subscribe({
+      next: (suppliersArray: any[]) => {
+        if (Array.isArray(suppliersArray)) {
+          this.suppliersSource.next(suppliersArray);
+        } else {
+          console.warn("fetchAndBroadcastSuppliers: Response was not an array.", suppliersArray);
+          this.suppliersSource.next([]);
+        }
+      },
+      error: (err: any) => {
+        console.error("Error fetching suppliers for BehaviorSubject:", err);
+        this.suppliersSource.next([]);
+      }
+    });
+    return request;
+  }
+
+
+  // Method to get data from the new FastAPI backend
+  getFastApiData(): Observable<any> {
+    return this.http.get('http://localhost:8000/api/data');
   }
 
 
@@ -170,8 +255,8 @@ export class ApiService {
     });
   }
 
-  updateProduct(formData: any): Observable<any> {
-    return this.http.put(`${ApiService.BASE_URL}/products/update`, formData, {
+  updateProduct(id: string, formData: any): Observable<any> {
+    return this.http.put(`${ApiService.BASE_URL}/products/update/${id}`, formData, {
       headers: this.getHeader(),
     });
   }
@@ -234,8 +319,10 @@ export class ApiService {
 
   
   updateTransactionStatus(id: string, status: string): Observable<any> {
-    return this.http.put(`${ApiService.BASE_URL}/transactions/update/${id}`, JSON.stringify(status), {
-      headers: this.getHeader().set("Content-Type", "application/json")
+    // The backend expects a JSON object like {"status": "NEW_STATUS"}
+    const body = { status: status };
+    return this.http.put(`${ApiService.BASE_URL}/transactions/update/${id}`, body, {
+      headers: this.getHeader()
     });
   }
 
