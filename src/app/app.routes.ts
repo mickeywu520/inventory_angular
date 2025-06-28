@@ -13,6 +13,9 @@ import { TransactionComponent } from './transaction/transaction.component';
 import { TransactionDetailsComponent } from './transaction-details/transaction-details.component';
 import { ProfileComponent } from './profile/profile.component';
 import { DashboardComponent } from './dashboard/dashboard.component';
+import { CustomerComponent } from './customer/customer.component';
+import { AddEditCustomerComponent } from './add-edit-customer/add-edit-customer.component';
+import { GoodsReceiptComponent } from './goods-receipt/goods-receipt.component';
 
 export const routes: Routes = [
 
@@ -25,12 +28,17 @@ export const routes: Routes = [
   { path: 'edit-supplier/:supplierId', component: AddEditSupplierComponent, canActivate:[GuardService], data: {requiresAdmin: true} },
   { path: 'add-supplier', component: AddEditSupplierComponent, canActivate:[GuardService], data: {requiresAdmin: true} },
 
+  { path: 'customer', component: CustomerComponent, canActivate:[GuardService], data: {requiresAdmin: true} },
+  { path: 'edit-customer/:customerId', component: AddEditCustomerComponent, canActivate:[GuardService], data: {requiresAdmin: true} },
+  { path: 'add-customer', component: AddEditCustomerComponent, canActivate:[GuardService], data: {requiresAdmin: true} },
+
   { path: 'product', component: ProductComponent, canActivate:[GuardService], data: {requiresAdmin: true} },
   { path: 'edit-product/:productId', component: AddEditProductComponent, canActivate:[GuardService], data: {requiresAdmin: true} },
   { path: 'add-product', component: AddEditProductComponent, canActivate:[GuardService], data: {requiresAdmin: true} },
 
 
   { path: 'purchase', component: PurchaseComponent, canActivate:[GuardService] },
+  { path: 'goods-receipt', component: GoodsReceiptComponent, canActivate:[GuardService] },
   { path: 'sell', component: SellComponent, canActivate:[GuardService] },
 
   { path: 'transaction', component: TransactionComponent, canActivate:[GuardService] },
