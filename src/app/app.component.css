@@ -4,17 +4,18 @@
     }
      
     .sidebar {
-     
+
     width: 13%;
     height: 100vh;
     background: linear-gradient(135deg, #1c1e21, #3a3f44);
     color: #f1f1f1;
+    display: flex;
     flex-direction: column;
-    justify-content: space-between;
     padding: 30px 0px;
     box-shadow: 5px 0 15px rgba(0, 0, 0, 0.2);
     position: fixed;
     transition: all 0.3s ease;
+    overflow: hidden;
     }
      
     .ims {
@@ -32,6 +33,90 @@
     list-style: none;
     padding: 0;
     margin: 0;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 5px;
+    }
+
+    /* 自定義滾動條樣式 */
+    .nav-links::-webkit-scrollbar {
+    width: 6px;
+    }
+
+    .nav-links::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    }
+
+    .nav-links::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+    transition: background 0.3s ease;
+    }
+
+    .nav-links::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+    }
+
+    /* 滾動觸發區域樣式 */
+    .scroll-trigger {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 50px;
+    z-index: 10;
+    pointer-events: auto;
+    transition: background-color 0.3s ease;
+    }
+
+    .scroll-trigger-top {
+    top: 80px; /* 在標題下方 */
+    background: linear-gradient(to bottom, rgba(23, 162, 184, 0.1), transparent);
+    }
+
+    .scroll-trigger-bottom {
+    bottom: 20px;
+    background: linear-gradient(to top, rgba(23, 162, 184, 0.1), transparent);
+    }
+
+    .scroll-trigger:hover {
+    background-color: rgba(23, 162, 184, 0.2);
+    }
+
+    /* 滾動指示器 */
+    .scroll-trigger::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    opacity: 0.6;
+    transition: opacity 0.3s ease;
+    }
+
+    .scroll-trigger-top::after {
+    top: 15px;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 12px solid #17a2b8;
+    }
+
+    .scroll-trigger-bottom::after {
+    bottom: 15px;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 12px solid #17a2b8;
+    }
+
+    .scroll-trigger:hover::after {
+    opacity: 1;
+    }
+
+    /* 桌面版隱藏漢堡選單按鈕 */
+    .mobile-menu-btn {
+    display: none;
     }
      
     .nav-links li {
@@ -90,17 +175,124 @@
     overflow-y: auto;
     }
      
-    @media (max-width: 768px) {
+    /* 平板版適配 */
+    @media (max-width: 1024px) and (min-width: 769px) {
     .sidebar {
-    width: 15%;
+    width: 18%;
     }
-     
-    .logo {
-    font-size: 1.5rem;
+
+    .main-content {
+    margin-left: 18%;
     }
-     
+
+    .ims {
+    font-size: 28px;
+    }
+
+    .nav-links a {
+    font-size: 0.95rem;
+    padding: 8px 12px;
+    }
+    }
+
+    /* 手機版適配 - 可收縮側邊欄 */
+    @media (max-width: 768px) {
+    .dashboard-layout {
+    position: relative;
+    }
+
+    .sidebar {
+    width: 250px;
+    position: fixed;
+    left: -250px; /* 預設隱藏 */
+    top: 0;
+    height: 100vh;
+    z-index: 1000;
+    transition: left 0.3s ease;
+    padding: 20px 0;
+    }
+
+    .sidebar.open {
+    left: 0; /* 展開時顯示 */
+    }
+
+    .main-content {
+    margin-left: 0;
+    padding: 15px;
+    width: 100%;
+    transition: margin-left 0.3s ease;
+    }
+
+    .main-content.sidebar-open {
+    margin-left: 0; /* 手機版不推移主內容 */
+    }
+
+    .ims {
+    font-size: 20px;
+    text-align: center;
+    margin-left: 0;
+    margin-bottom: 20px;
+    }
+
+    .nav-links {
+    flex-direction: column;
+    padding: 0 15px;
+    }
+
+    .nav-links li {
+    margin: 8px 0;
+    }
+
     .nav-links a {
     font-size: 0.9rem;
+    padding: 12px 15px;
+    display: block;
+    border-radius: 8px;
+    }
+
+    /* 滾動觸發區域在手機版隱藏 */
+    .scroll-trigger {
+    display: none;
+    }
+
+    /* 遮罩層 */
+    .sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    .sidebar-overlay.show {
+    opacity: 1;
+    visibility: visible;
+    }
+
+    /* 漢堡選單按鈕 */
+    .mobile-menu-btn {
+    display: block;
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 1001;
+    background-color: #17a2b8;
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 18px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
+    .mobile-menu-btn:hover {
+    background-color: #138496;
     }
     }
     
