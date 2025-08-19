@@ -310,6 +310,181 @@ export class CustomerComponent implements OnInit {
     return '-';
   }
 
+  // 修改追蹤相關方法
+  isRecentlyModified(customer: any): boolean {
+    if (!customer.updatedAt) return false;
+    
+    const updatedDate = new Date(customer.updatedAt);
+    const createdDate = new Date(customer.createdDate);
+    const now = new Date();
+    
+    // 如果更新時間比建立時間晚，且在最近7天內修改過，則顯示指示器
+    const daysDiff = (now.getTime() - updatedDate.getTime()) / (1000 * 3600 * 24);
+    const isModified = updatedDate.getTime() > createdDate.getTime();
+    
+    return isModified && daysDiff <= 7;
+  }
+
+  // 檢查特定欄位是否被修改過
+  isFieldModified(customer: any, fieldName: string): boolean {
+    // 調試日誌
+    if (customer.modified_fields) {
+      console.log(`Customer ${customer.id} modified_fields:`, customer.modified_fields);
+    }
+    
+    // 只有當客戶有 modified_fields 且該欄位在列表中時才返回 true
+    if (customer.modified_fields && customer.modified_fields.includes(fieldName)) {
+      console.log(`Field ${fieldName} is modified for customer ${customer.id}`);
+      return true;
+    }
+    
+    // 不使用回退機制，只有真正修改過的欄位才顯示小紅點
+    return false;
+  }
+
+  // 檢查是否應該顯示氣泡（只有當前懸停的欄位才顯示）
+  shouldShowHistoryPopup(customer: any, fieldName: string): boolean {
+    return this.showFieldHistory && 
+           this.currentFieldHistory && 
+           this.currentHoveredCustomer && 
+           this.currentHoveredCustomer.id === customer.id && 
+           this.currentHoveredField === fieldName;
+  }
+
+  getModificationTooltip(customer: any): string {
+    if (!customer.updatedAt) return '';
+    
+    const updatedDate = new Date(customer.updatedAt);
+    const formattedDate = updatedDate.toLocaleString('zh-TW', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    
+    return `最後修改時間：${formattedDate}`;
+  }
+
+  // 獲取欄位的修改歷史並顯示在 tooltip 中
+  getFieldModificationTooltip(customer: any, fieldKey: string): string {
+    // 這個方法會被 HTML 中的 tooltip 調用
+    // 我們需要異步獲取數據，所以先返回基本信息
+    if (!this.isRecentlyModified(customer)) {
+      return '';
+    }
+    
+    // 觸發異步獲取詳細歷史
+    this.loadFieldHistory(customer.id, fieldKey);
+    
+    // 先返回基本的修改時間信息
+    return this.getModificationTooltip(customer);
+  }
+
+  // 異步載入欄位修改歷史
+  private fieldHistoryCache: { [key: string]: any } = {};
+  
+  // 當前顯示的修改歷史資訊
+  currentFieldHistory: any = null;
+  showFieldHistory: boolean = false;
+  
+  // 當前懸停的客戶和欄位
+  currentHoveredCustomer: any = null;
+  currentHoveredField: string = '';
+  
+  // 滑鼠位置追蹤
+  mousePosition = { x: 0, y: 0 };
+  
+  loadFieldHistory(customerId: number, fieldName: string): void {
+    const cacheKey = `${customerId}_${fieldName}`;
+    
+    // 如果已經有緩存，直接顯示
+    if (this.fieldHistoryCache[cacheKey]) {
+      this.displayFieldHistory(this.fieldHistoryCache[cacheKey], fieldName);
+      return;
+    }
+    
+    this.apiService.getFieldHistory(customerId.toString(), fieldName).subscribe({
+      next: (response: any) => {
+        this.fieldHistoryCache[cacheKey] = response;
+        this.displayFieldHistory(response, fieldName);
+      },
+      error: (error) => {
+        console.warn('Failed to load field history:', error);
+        this.hideFieldHistory();
+      }
+    });
+  }
+
+  // 顯示欄位修改歷史
+  displayFieldHistory(history: any, fieldName: string): void {
+    if (history && history.has_history) {
+      this.currentFieldHistory = {
+        fieldName: fieldName, // 記錄欄位名稱，用於 HTML 中的條件判斷
+        oldValue: history.old_value,
+        newValue: history.new_value,
+        changedAt: new Date(history.changed_at).toLocaleString('zh-TW', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      };
+      this.showFieldHistory = true;
+    } else {
+      this.hideFieldHistory();
+    }
+  }
+
+  // 隱藏欄位修改歷史
+  hideFieldHistory(): void {
+    this.showFieldHistory = false;
+    this.currentFieldHistory = null;
+    this.currentHoveredCustomer = null;
+    this.currentHoveredField = '';
+  }
+
+  // 滑鼠懸停事件處理
+  onFieldHover(customer: any, fieldKey: string, event: MouseEvent): void {
+    // 記錄當前懸停的客戶和欄位
+    this.currentHoveredCustomer = customer;
+    this.currentHoveredField = fieldKey;
+    // 現在只有真正修改過的欄位才會觸發
+    this.loadFieldHistory(customer.id, fieldKey);
+  }
+
+  // 滑鼠離開事件處理
+  private hideTimeout: any;
+  
+  onFieldLeave(): void {
+    // 延遲隱藏，避免滑鼠快速移動時閃爍
+    this.hideTimeout = setTimeout(() => {
+      this.hideFieldHistory();
+    }, 200);
+  }
+
+  // 獲取欄位的詳細修改信息
+  getFieldHistoryTooltip(customer: any, fieldKey: string): string {
+    const cacheKey = `${customer.id}_${fieldKey}`;
+    const history = this.fieldHistoryCache[cacheKey];
+    
+    if (!history || !history.has_history) {
+      return this.getModificationTooltip(customer);
+    }
+    
+    const changedDate = new Date(history.changed_at);
+    const formattedDate = changedDate.toLocaleString('zh-TW', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    
+    return `修改前：${history.old_value || '(空值)'}\n修改後：${history.new_value || '(空值)'}\n修改時間：${formattedDate}`;
+  }
+
   showMessage(message: string) {
     this.message = message;
     setTimeout(() => {
