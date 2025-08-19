@@ -5,6 +5,7 @@ import { Router, RouterLink } from '@angular/router';
 import { ApiService } from '../service/api.service';
 import { LoadingService } from '../service/loading.service';
 import { TranslateModule } from '@ngx-translate/core';
+import { BusinessHoursDialogComponent } from '../business-hours-dialog/business-hours-dialog.component';
 
 // 導入台灣郵遞區號數據
 import taiwanPostalCodes from '../../assets/data/taiwanPostalCodes.json';
@@ -12,7 +13,7 @@ import taiwanPostalCodes from '../../assets/data/taiwanPostalCodes.json';
 @Component({
   selector: 'app-add-edit-customer',
   standalone: true,
-  imports: [FormsModule, CommonModule, RouterLink, TranslateModule],
+  imports: [FormsModule, CommonModule, RouterLink, TranslateModule, BusinessHoursDialogComponent],
   templateUrl: './add-edit-customer.component.html',
   styleUrl: './add-edit-customer.component.css'
 })
@@ -51,6 +52,22 @@ export class AddEditCustomerComponent implements OnInit {
   // 郵遞區號（根據選擇的區域自動帶入）
   postalCode: string = '';
 
+  dayNames = ['週一','週二','週三','週四','週五','週六','週日'];
+  showBusinessHoursDialog = false;
+
+  businessHoursModel: any = {
+    weekly: [
+      { weekday: 0, is_open: false, ranges: [] },
+      { weekday: 1, is_open: false, ranges: [] },
+      { weekday: 2, is_open: false, ranges: [] },
+      { weekday: 3, is_open: false, ranges: [] },
+      { weekday: 4, is_open: false, ranges: [] },
+      { weekday: 5, is_open: false, ranges: [] },
+      { weekday: 6, is_open: false, ranges: [] },
+    ],
+    exceptions: []
+  };
+
   formData: any = {
     customerType: '',
     salesPersonId: '',
@@ -75,6 +92,8 @@ export class AddEditCustomerComponent implements OnInit {
   };
 
   ngOnInit(): void {
+    // 若為編輯模式，載入營業時間
+
     this.customerId = this.router.url.split('/')[2]; //extracting customer id from url
     if (this.customerId) {
       this.isEditing = true;
@@ -124,6 +143,9 @@ export class AddEditCustomerComponent implements OnInit {
           }
         }
 
+        // 同步營業時間（若後端已有資料）
+        this.loadBusinessHours();
+
         this.formData = {
           customerType: res.customer_type_id || res.customer_type_obj?.id || '',
           salesPersonId: res.salesPersonId || '',
@@ -169,6 +191,78 @@ export class AddEditCustomerComponent implements OnInit {
     });
   }
 
+  loadBusinessHours(): void {
+    if (!this.customerId) return;
+    this.apiService.getCustomerBusinessHours(this.customerId).subscribe({
+      next: (res: any) => {
+        // 資料格式：{ weekly: [{weekday,is_open,ranges:[{start,end}]}...], exceptions: [...] }
+        // 確保例外日 ranges 至少有一個元素供 UI 綁定
+        const ex = (res.exceptions || []).map((e: any) => ({
+          ...e,
+          ranges: e.is_open ? (e.ranges && e.ranges.length ? e.ranges : [{ start: '09:00', end: '18:00' }]) : []
+        }));
+        this.businessHoursModel = {
+          weekly: res.weekly || this.businessHoursModel.weekly,
+          exceptions: ex
+        };
+      },
+      error: (err) => {
+        console.warn('No business hours found or failed to load', err);
+      }
+    });
+  }
+
+  // 營業時間對話框相關方法
+  openBusinessHoursDialog(): void {
+    this.showBusinessHoursDialog = true;
+  }
+
+  onBusinessHoursSave(businessHoursData: any): void {
+    this.businessHoursModel = businessHoursData;
+    this.showBusinessHoursDialog = false;
+  }
+
+  onBusinessHoursCancel(): void {
+    this.showBusinessHoursDialog = false;
+  }
+
+  hasBusinessHours(): boolean {
+    return this.businessHoursModel.weekly.some((day: any) => day.is_open) || 
+           (this.businessHoursModel.exceptions && this.businessHoursModel.exceptions.length > 0);
+  }
+
+  private buildBusinessHoursPayload() {
+    const weekly = (this.businessHoursModel.weekly || []).map((d: any) => ({
+      weekday: d.weekday,
+      is_open: !!d.is_open,
+      ranges: d.is_open ? (d.ranges || []).filter((r: any) => r.start && r.end).map((r: any) => ({ start: r.start, end: r.end })) : []
+    }));
+
+    const exceptions = (this.businessHoursModel.exceptions || []).map((e: any) => ({
+      date: e.date,
+      is_open: !!e.is_open,
+      ranges: e.is_open && e.ranges && e.ranges.length && e.ranges[0].start && e.ranges[0].end ? [{ start: e.ranges[0].start, end: e.ranges[0].end }] : null,
+      reason: e.reason || null
+    }));
+
+    return { weekly, exceptions };
+  }
+
+  private saveBusinessHoursAndNavigate(customerId: string | number): void {
+    const payload = this.buildBusinessHoursPayload();
+    this.apiService.updateCustomerBusinessHours(String(customerId), payload).subscribe({
+      next: () => {
+        this.loadingService.hideLoading();
+        this.router.navigate(['/customer']);
+      },
+      error: (err) => {
+        console.warn('Failed to save business hours:', err);
+        this.loadingService.hideLoading();
+        this.router.navigate(['/customer']);
+      }
+    });
+  }
+
   // HANDLE FORM SUBMISSION
   handleSubmit() {
     if (!this.formData.customerType || !this.formData.customerCode || !this.formData.customerName) {
@@ -208,9 +302,8 @@ export class AddEditCustomerComponent implements OnInit {
       this.loadingService.showUpdating();
       this.apiService.updateCustomer(this.customerId!, customerData).subscribe({
         next: (res: any) => {
-          this.showMessage("Customer updated successfully");
-          this.loadingService.hideLoading();
-          this.router.navigate(['/customer'])
+          // 更新客戶成功後，保存營業時間
+          this.saveBusinessHoursAndNavigate(this.customerId!);
         },
         error: (error) => {
           this.showMessage(error?.error?.message || error?.message || "Unable to edit customer" + error)
@@ -221,19 +314,8 @@ export class AddEditCustomerComponent implements OnInit {
       this.loadingService.showSaving();
       this.apiService.addCustomer(customerData).subscribe({
         next: (res: any) => {
-          this.showMessage("Customer added successfully");
-          this.loadingService.hideLoading();
-          // 刷新客戶列表
-          this.apiService.fetchAndBroadcastCustomers().subscribe({
-            next: () => {
-              console.log('Customers list refreshed after adding new customer');
-              this.router.navigate(['/customer']);
-            },
-            error: (error) => {
-              console.error('Error refreshing customers list:', error);
-              this.router.navigate(['/customer']);
-            }
-          });
+          // 新增客戶成功後，保存營業時間
+          this.saveBusinessHoursAndNavigate(res.id);
         },
         error: (error) => {
           this.showMessage(error?.error?.message || error?.message || "Unable to add customer" + error)
